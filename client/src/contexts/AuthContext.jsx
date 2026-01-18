@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, db } from '../firebase';
 import {
-    createUserWithEmailAndPassword,
-    signInWithEmailAndPassword,
-    signOut,
-    onAuthStateChanged
+    onAuthStateChanged,
+    sendSignInLinkToEmail,
+    isSignInWithEmailLink,
+    signInWithEmailLink,
+    signOut
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 import { encryptionService } from '../services/encryptionService';
 
 const AuthContext = createContext();
@@ -20,35 +21,54 @@ export function AuthProvider({ children }) {
     const [userProfile, setUserProfile] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    async function signup(email, password, name) {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-
-        // Encrypt name and save to Firestore
-        try {
-            const encryptedName = encryptionService.encrypt(name, user.uid);
-            await setDoc(doc(db, 'users', user.uid), {
-                encryptedName: encryptedName
-            });
-            setUserProfile({ displayName: name });
-        } catch (error) {
-            console.error("Failed to save encrypted profile", error);
-        }
-
-        return userCredential;
+    async function sendLoginLink(email) {
+        const actionCodeSettings = {
+            url: window.location.origin,
+            handleCodeInApp: true,
+        };
+        await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+        window.localStorage.setItem('emailForSignIn', email);
     }
 
-    function login(email, password) {
-        return signInWithEmailAndPassword(auth, email, password);
+    async function finishLoginWithLink(emailFromLink) {
+        if (isSignInWithEmailLink(auth, window.location.href)) {
+            let email = window.localStorage.getItem('emailForSignIn');
+            if (!email) {
+                email = window.prompt('אנא אמת את האימייל שלך לכניסה:');
+            }
+            if (email) {
+                const result = await signInWithEmailLink(auth, email, window.location.href);
+                window.localStorage.removeItem('emailForSignIn');
+
+                // Initialize profile if needed
+                if (result.user) {
+                    // We can't really "encrypt" a name here since we don't have a password registration flow
+                    // So we just use the email prefix as a default display name or ask user later.
+                    // For now, let's ensure the user doc exists.
+                    const user = result.user;
+                    const docRef = doc(db, 'users', user.uid);
+                    const docSnap = await getDoc(docRef);
+                    if (!docSnap.exists()) {
+                        // New user via magic link
+                        await setDoc(docRef, {
+                            createdAt: new Date().toISOString(),
+                            email: user.email
+                        });
+                    }
+                }
+                return result.user;
+            }
+        }
+        return null;
     }
 
     function logout() {
-        setUserProfile(null);
         return signOut(auth);
     }
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            setCurrentUser(user);
             if (user) {
                 // Fetch encrypted profile
                 try {
@@ -58,11 +78,17 @@ export function AuthProvider({ children }) {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
                         if (data.encryptedName) {
-                            const decryptedName = encryptionService.decrypt(data.encryptedName, user.uid);
-                            setUserProfile({ displayName: decryptedName });
+                            try {
+                                const decryptedName = encryptionService.decrypt(data.encryptedName, user.uid);
+                                setUserProfile({ displayName: decryptedName });
+                            } catch (e) {
+                                console.error("Decryption err", e);
+                                setUserProfile({ displayName: user.email });
+                            }
+                        } else {
+                            setUserProfile({ displayName: user.email.split('@')[0] });
                         }
                     } else {
-                        // Profile doesn't exist yet (or legacy user)
                         setUserProfile({ displayName: user.email.split('@')[0] });
                     }
                 } catch (error) {
@@ -71,7 +97,6 @@ export function AuthProvider({ children }) {
             } else {
                 setUserProfile(null);
             }
-            setCurrentUser(user);
             setLoading(false);
         });
 
@@ -81,8 +106,8 @@ export function AuthProvider({ children }) {
     const value = {
         currentUser,
         userProfile,
-        signup,
-        login,
+        sendLoginLink,
+        finishLoginWithLink,
         logout
     };
 

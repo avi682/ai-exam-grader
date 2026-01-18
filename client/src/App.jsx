@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UploadSection } from './components/UploadSection';
 import { ResultsTable } from './components/ResultsTable';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { Login } from './components/Login';
-import { Signup } from './components/Signup';
+import { MagicLinkLogin } from './components/MagicLinkLogin';
 import { CloudHistoryModal } from './components/CloudHistoryModal';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from './firebase';
@@ -17,9 +16,19 @@ function AppContent() {
   const [error, setError] = useState(null);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
 
-  const { currentUser, userProfile, logout } = useAuth();
+  const { currentUser, userProfile, logout, finishLoginWithLink } = useAuth();
+
+  // Check for Magic Link redirect on mount
+  useEffect(() => {
+    finishLoginWithLink().then(user => {
+      if (user) {
+        console.log("Magic Link Login Successful");
+        // Remove the query params from URL to clean up
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    });
+  }, []);
 
   const handleGrade = async (files) => {
     setIsGrading(true);
@@ -97,11 +106,7 @@ function AppContent() {
           מערכת מאובטחת לבדיקת מבחנים
         </p>
 
-        {authMode === 'login' ? (
-          <Login setMode={setAuthMode} />
-        ) : (
-          <Signup setMode={setAuthMode} />
-        )}
+        <MagicLinkLogin />
       </div>
     );
   }
@@ -110,7 +115,7 @@ function AppContent() {
     <div className="container">
       <header className="app-header">
         <div className="user-menu">
-          <span className="welcome-msg">שלום, {userProfile?.displayName || 'משתמש'}</span>
+          <span className="welcome-msg">שלום, {userProfile?.displayName || currentUser.email}</span>
           <button className="history-btn" onClick={() => setShowHistory(true)}>
             📂 היסטוריה
           </button>
