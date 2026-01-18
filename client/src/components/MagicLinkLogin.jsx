@@ -63,8 +63,10 @@ export function MagicLinkLogin() {
                 </button>
             </form>
 
-            <div style={{ fontSize: '10px', color: '#666', marginTop: '20px', textAlign: 'center' }}>
-                Powered by Firebase Magic Link
+            <div style={{ fontSize: '10px', color: '#ccc', marginTop: '20px', textAlign: 'center', direction: 'ltr' }}>
+                Powered by Firebase Magic Link <br />
+                Key: {JSON.stringify("AIzaSyDT1z4chj1gmc0RaQlOt7EJQgJbU89I4y8")} <br />
+                Host: {window.location.hostname}
             </div>
         </div>
     );
