@@ -53,7 +53,7 @@ export function Signup({ setMode }) {
                 כבר יש לך חשבון? <span onClick={() => setMode('login')} className="link">התחבר</span>
             </div>
             <div style={{ fontSize: '10px', color: '#ccc', marginTop: '20px', textAlign: 'center', direction: 'ltr' }}>
-                Using Key: {JSON.stringify("AIzaSyD6ER6oPFwSSectPMNwfCusxzqYl2hTfcg")}
+                Using Key: {JSON.stringify("AIzaSyDT1z4chj1gmc0RaQlOt7EJQgJbU89I4y8")}
             </div>
         </div>
     );

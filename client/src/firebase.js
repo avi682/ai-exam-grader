@@ -5,13 +5,12 @@ import { getFirestore } from "firebase/firestore";
 // DEBUG: Log the config to console to verify it is loaded
 // Hardcoded keys to ensure no loading errors occur.
 const firebaseConfig = {
-    apiKey: "AIzaSyD6ER6oPFwSSectPMNwfCusxzqYl2hTfcg",
-    authDomain: "mygrader-7bc03.firebaseapp.com",
-    projectId: "mygrader-7bc03",
-    storageBucket: "mygrader-7bc03.firebasestorage.app",
-    messagingSenderId: "386653185976",
-    appId: "1:386653185976:web:d6ac76e98dd819b438514d",
-    measurementId: "G-HRPTFE2T5C"
+    apiKey: "AIzaSyDT1z4chj1gmc0RaQlOt7EJQgJbU89I4y8",
+    authDomain: "exam-grader-new.firebaseapp.com",
+    projectId: "exam-grader-new",
+    storageBucket: "exam-grader-new.firebasestorage.app",
+    messagingSenderId: "225954040833",
+    appId: "1:225954040833:web:3adaa369f7b90fb3e84400"
 };
 
 console.log("🔥 Firebase Config Loaded:", firebaseConfig);

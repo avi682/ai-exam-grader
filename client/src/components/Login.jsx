@@ -42,7 +42,7 @@ export function Login({ setMode }) {
                 אין לך חשבון? <span onClick={() => setMode('signup')} className="link">הירשם כאן</span>
             </div>
             <div style={{ fontSize: '10px', color: '#ccc', marginTop: '20px' }}>
-                Debug Key: {JSON.parse(import.meta.env.VITE_FIREBASE_Config || '{}').apiKey || "AIzaSyD6ER6oPFwSSectPMNwfCusxzqYl2hTfcg"}
+                Debug Key: {JSON.parse(import.meta.env.VITE_FIREBASE_Config || '{}').apiKey || "AIzaSyDT1z4chj1gmc0RaQlOt7EJQgJbU89I4y8"}
             </div>
         </div>
     );
