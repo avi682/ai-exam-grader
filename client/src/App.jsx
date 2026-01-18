@@ -1,34 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { UploadSection } from './components/UploadSection';
 import { ResultsTable } from './components/ResultsTable';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { MagicLinkLogin } from './components/MagicLinkLogin';
-import { CloudHistoryModal } from './components/CloudHistoryModal';
-import { collection, addDoc } from 'firebase/firestore';
-import { db } from './firebase';
-import { encryptionService } from './services/encryptionService';
+import { HistoryModal } from './components/HistoryModal';
+import { historyService } from './services/historyService';
 
-function AppContent() {
+function App() {
   const [results, setResults] = useState(null);
   const [excelFile, setExcelFile] = useState(null);
   const [isGrading, setIsGrading] = useState(false);
   const [error, setError] = useState(null);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-
-  const { currentUser, userProfile, logout, finishLoginWithLink } = useAuth();
-
-  // Check for Magic Link redirect on mount
-  useEffect(() => {
-    finishLoginWithLink().then(user => {
-      if (user) {
-        console.log("Magic Link Login Successful");
-        // Remove the query params from URL to clean up
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    });
-  }, []);
 
   const handleGrade = async (files) => {
     setIsGrading(true);
@@ -56,31 +39,24 @@ function AppContent() {
       setResults(data.results);
       setExcelFile(data.excelFile);
 
-      // Save to Cloud with Encryption
-      if (currentUser) {
-        try {
-          const sensitiveData = {
-            results: data.results,
-            excelFile: data.excelFile,
-            studentCount: data.results.length,
-            averageScore: Math.round(data.results.reduce((sum, r) => sum + (r.totalScore || 0), 0) / data.results.length)
-          };
-
-          const encrypted = encryptionService.encrypt(sensitiveData, currentUser.uid);
-
-          await addDoc(collection(db, 'exams'), {
-            userId: currentUser.uid,
-            timestamp: new Date().toISOString(),
-            encryptedData: encrypted // Only encrypted blob is saved
-          });
-        } catch (saveError) {
-          console.error("Cloud save failed", saveError);
-          // Don't block the user, just log
-        }
+      // Save to Local History automatically
+      try {
+        const examData = {
+          id: Date.now().toString(),
+          timestamp: new Date().toISOString(),
+          results: data.results,
+          excelFile: data.excelFile,
+          studentCount: data.results.length,
+          averageScore: Math.round(data.results.reduce((sum, r) => sum + (r.totalScore || 0), 0) / data.results.length)
+        };
+        historyService.saveExam(examData);
+      } catch (e) {
+        console.error("Local save failed", e);
       }
 
     } catch (err) {
       setError('שגיאה בתהליך הבדיקה. וודא שהשרת רץ ושכל הקבצים תקינים.');
+      console.error(err);
     } finally {
       setIsGrading(false);
     }
@@ -98,34 +74,22 @@ function AppContent() {
     setError(null);
   };
 
-  if (!currentUser) {
-    return (
-      <div className="container">
-        <h1>AI Exam Grader 🤖</h1>
-        <p style={{ textAlign: 'center', marginBottom: '2rem', color: '#64748b' }}>
-          מערכת מאובטחת לבדיקת מבחנים
-        </p>
-
-        <MagicLinkLogin />
-      </div>
-    );
-  }
-
   return (
     <div className="container">
       <header className="app-header">
-        <div className="user-menu">
-          <span className="welcome-msg">שלום, {userProfile?.displayName || currentUser.email}</span>
-          <button className="history-btn" onClick={() => setShowHistory(true)}>
-            📂 היסטוריה
-          </button>
-          <button className="btn-secondary" onClick={() => logout()}>התנתק</button>
+        <div className="user-menu" style={{ justifyContent: 'center', width: '100%' }}>
+          <h1 style={{ fontSize: '1.5rem', margin: 0 }}>🤖 AI Exam Grader</h1>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
+            <button className="history-btn" onClick={() => setShowHistory(true)}>
+              📂 היסטוריה
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Privacy Notice Banner */}
       <div className="privacy-banner">
-        🔒 הנתונים מוצפנים ונשמרים בענן המאובטח.
+        🔒 המערכת עובדת באופן מקומי וחד-פעמי. הנתונים לא נשמרים בענן.
         <button className="privacy-link" onClick={() => setShowPrivacy(true)}>
           קרא עוד
         </button>
@@ -151,20 +115,12 @@ function AppContent() {
 
       <PrivacyPolicy isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
 
-      <CloudHistoryModal
+      <HistoryModal
         isOpen={showHistory}
         onClose={() => setShowHistory(false)}
         onLoadExam={loadExamFromHistory}
       />
     </div>
-  );
-}
-
-function App() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
   );
 }
 
