@@ -20,6 +20,9 @@ function App() {
 
     const formData = new FormData();
     formData.append('exam', files.exam);
+    if (files.solvedExam) {
+      formData.append('solvedExam', files.solvedExam);
+    }
     formData.append('rubricText', files.rubricText);
     files.submissions.forEach(file => {
       formData.append('submissions', file);

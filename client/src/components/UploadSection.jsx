@@ -1,14 +1,14 @@
-
 import React, { useCallback, useState } from 'react';
 
 export function UploadSection({ onFilesSelected, isGrading }) {
     const [files, setFiles] = useState({
         exam: null,
+        solvedExam: null,
         submissions: []
     });
     const [rubricText, setRubricText] = useState('');
-    const [dragActive, setDragActive] = useState({ exam: false, submissions: false });
-    const [showModal, setShowModal] = useState(null); // 'exam' or 'submissions' or null
+    const [dragActive, setDragActive] = useState({ exam: false, solvedExam: false, submissions: false });
+    const [showModal, setShowModal] = useState(null); // 'exam', 'solvedExam', 'submissions' or null
 
     const handleFileChange = (type, e) => {
         const selectedFiles = e.target.files;
@@ -56,10 +56,15 @@ export function UploadSection({ onFilesSelected, isGrading }) {
         if (!filesList) return null;
         const list = Array.isArray(filesList) ? filesList : [filesList];
 
+        let title = '';
+        if (type === 'exam') title = 'שאלון המבחן';
+        else if (type === 'solvedExam') title = 'מבחן פתור';
+        else title = 'מבחני תלמידים';
+
         return (
             <div className="modal-overlay" onClick={onClose}>
                 <div className="modal-content" onClick={e => e.stopPropagation()}>
-                    <h3>{type === 'exam' ? 'שאלון המבחן' : 'מבחני תלמידים'} ({list.length})</h3>
+                    <h3>{title} ({list.length})</h3>
                     <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                         {list.map((file, idx) => (
                             <div key={idx} className="file-list-item">
@@ -81,6 +86,7 @@ export function UploadSection({ onFilesSelected, isGrading }) {
         <div className="card">
             <h2>📄 העלאת קבצים</h2>
             <div className="upload-grid">
+                {/* 1. Blank Exam */}
                 <div
                     className={`upload-zone ${dragActive.exam ? 'drag-active' : ''} ${files.exam ? 'file-selected' : ''}`}
                     onDragEnter={(e) => handleDrag('exam', e)}
@@ -92,20 +98,41 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                     <p className="text-dim">
                         {files.exam ? `נבחר: ${files.exam.name}` : 'גרור קובץ לכאן או לחץ לבחירה'}
                     </p>
-                    {files.exam && (
-                        <div className="file-counter">1</div>
-                    )}
+                    {files.exam && <div className="file-counter">1</div>}
                     {files.exam && (
                         <button className="view-files-btn" onClick={(e) => {
-                            e.preventDefault(); // Prevent file picker opening
+                            e.preventDefault();
                             setShowModal('exam');
                         }}>👁️ הצג קובץ</button>
                     )}
                     <input type="file" onChange={(e) => handleFileChange('exam', e)} accept=".pdf,.txt,.md,.docx" />
                 </div>
 
+                {/* 2. Solved Exam (Optional but Recommended) */}
+                <div
+                    className={`upload-zone ${dragActive.solvedExam ? 'drag-active' : ''} ${files.solvedExam ? 'file-selected' : ''}`}
+                    onDragEnter={(e) => handleDrag('solvedExam', e)}
+                    onDragLeave={(e) => handleDrag('solvedExam', e)}
+                    onDragOver={(e) => handleDrag('solvedExam', e)}
+                    onDrop={(e) => handleDrop('solvedExam', e)}
+                >
+                    <h3>2. מבחן פתור / דוגמה (Optional)</h3>
+                    <p className="text-dim">
+                        {files.solvedExam ? `נבחר: ${files.solvedExam.name}` : 'מומלץ! גרור מבחן פתור לדוגמה'}
+                    </p>
+                    {files.solvedExam && <div className="file-counter">1</div>}
+                    {files.solvedExam && (
+                        <button className="view-files-btn" onClick={(e) => {
+                            e.preventDefault();
+                            setShowModal('solvedExam');
+                        }}>👁️ הצג קובץ</button>
+                    )}
+                    <input type="file" onChange={(e) => handleFileChange('solvedExam', e)} accept=".pdf,.txt,.md,.docx,.jpg,.jpeg,.png" />
+                </div>
+
+                {/* 3. Rubric */}
                 <div className="upload-zone" style={{ gridColumn: '1 / -1' }}>
-                    <h3>2. מחוון / הוראות בדיקה (Rubric)</h3>
+                    <h3>3. מחוון / הוראות בדיקה (Rubric)</h3>
                     <p className="text-dim">כתוב כאן את התשובות הנכונות ואת הניקוד לכל שאלה</p>
                     <textarea
                         value={rubricText}
@@ -116,6 +143,7 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                     />
                 </div>
 
+                {/* 4. Submissions */}
                 <div
                     className={`upload-zone ${dragActive.submissions ? 'drag-active' : ''} ${files.submissions.length > 0 ? 'file-selected' : ''}`}
                     onDragEnter={(e) => handleDrag('submissions', e)}
@@ -124,13 +152,11 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                     onDrop={(e) => handleDrop('submissions', e)}
                     style={{ gridColumn: '1 / -1' }}
                 >
-                    <h3>3. מבחני תלמידים (Submissions)</h3>
+                    <h3>4. מבחני תלמידים (Submissions)</h3>
                     <p className="text-dim">
                         {files.submissions.length > 0 ? `נבחרו ${files.submissions.length} קבצים` : 'גרור תיקייה/קבצים לכאן או לחץ לבחירה'}
                     </p>
-                    {files.submissions.length > 0 && (
-                        <div className="file-counter">{files.submissions.length}</div>
-                    )}
+                    {files.submissions.length > 0 && <div className="file-counter">{files.submissions.length}</div>}
                     {files.submissions.length > 0 && (
                         <button className="view-files-btn" onClick={(e) => {
                             e.preventDefault();
@@ -141,7 +167,7 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                         type="file"
                         multiple
                         onChange={(e) => handleFileChange('submissions', e)}
-                        accept=".pdf,.txt,.md,.docx"
+                        accept=".pdf,.txt,.md,.docx,.jpg,.jpeg,.png"
                     />
                 </div>
             </div>
@@ -159,7 +185,11 @@ export function UploadSection({ onFilesSelected, isGrading }) {
             {showModal && (
                 <FileListModal
                     type={showModal}
-                    filesList={showModal === 'exam' ? files.exam : files.submissions}
+                    filesList={
+                        showModal === 'exam' ? files.exam :
+                            showModal === 'solvedExam' ? files.solvedExam :
+                                files.submissions
+                    }
                     onClose={() => setShowModal(null)}
                 />
             )}

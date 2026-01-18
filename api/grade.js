@@ -159,6 +159,7 @@ module.exports = async (req, res) => {
         const { files, fields } = await parseMultipartForm(req);
 
         const examFile = files['exam'] ? files['exam'][0] : null;
+        const solvedExamFile = files['solvedExam'] ? files['solvedExam'][0] : null;
         const rubricText = fields['rubricText'];
         const submissionFiles = files['submissions'] || [];
 
@@ -174,7 +175,9 @@ module.exports = async (req, res) => {
                 examFile.mimetype,
                 rubricText,
                 submissionFile.buffer,
-                submissionFile.mimetype
+                submissionFile.mimetype,
+                solvedExamFile ? solvedExamFile.buffer : null,
+                solvedExamFile ? solvedExamFile.mimetype : null
             );
 
             let finalStudentName = gradeResult.studentName;
