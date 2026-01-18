@@ -41,6 +41,9 @@ export function Login({ setMode }) {
             <div className="auth-footer">
                 אין לך חשבון? <span onClick={() => setMode('signup')} className="link">הירשם כאן</span>
             </div>
+            <div style={{ fontSize: '10px', color: '#ccc', marginTop: '20px' }}>
+                Debug Key: {JSON.parse(import.meta.env.VITE_FIREBASE_Config || '{}').apiKey || "Hardcoded check..."}
+            </div>
         </div>
     );
 }

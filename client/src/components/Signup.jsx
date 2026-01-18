@@ -52,6 +52,9 @@ export function Signup({ setMode }) {
             <div className="auth-footer">
                 כבר יש לך חשבון? <span onClick={() => setMode('login')} className="link">התחבר</span>
             </div>
+            <div style={{ fontSize: '10px', color: '#ccc', marginTop: '20px', textAlign: 'center', direction: 'ltr' }}>
+                Using Key: {JSON.stringify("AIzaSyD6ER6oPFwSSectPMNwfCusxzqYl2hTfcg")}
+            </div>
         </div>
     );
 }
