@@ -1,15 +1,25 @@
-
 import React, { useState } from 'react';
 import { UploadSection } from './components/UploadSection';
 import { ResultsTable } from './components/ResultsTable';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { Login } from './components/Login';
+import { Signup } from './components/Signup';
+import { CloudHistoryModal } from './components/CloudHistoryModal';
+import { collection, addDoc } from 'firebase/firestore';
+import { db } from './firebase';
+import { encryptionService } from './services/encryptionService';
 
-function App() {
+function AppContent() {
   const [results, setResults] = useState(null);
   const [excelFile, setExcelFile] = useState(null);
   const [isGrading, setIsGrading] = useState(false);
   const [error, setError] = useState(null);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
+
+  const { currentUser, userProfile, logout } = useAuth();
 
   const handleGrade = async (files) => {
     setIsGrading(true);
@@ -36,8 +46,31 @@ function App() {
       const data = await response.json();
       setResults(data.results);
       setExcelFile(data.excelFile);
+
+      // Save to Cloud with Encryption
+      if (currentUser) {
+        try {
+          const sensitiveData = {
+            results: data.results,
+            excelFile: data.excelFile,
+            studentCount: data.results.length,
+            averageScore: Math.round(data.results.reduce((sum, r) => sum + (r.totalScore || 0), 0) / data.results.length)
+          };
+
+          const encrypted = encryptionService.encrypt(sensitiveData, currentUser.uid);
+
+          await addDoc(collection(db, 'exams'), {
+            userId: currentUser.uid,
+            timestamp: new Date().toISOString(),
+            encryptedData: encrypted // Only encrypted blob is saved
+          });
+        } catch (saveError) {
+          console.error("Cloud save failed", saveError);
+          // Don't block the user, just log
+        }
+      }
+
     } catch (err) {
-      // Privacy: No logging of errors
       setError('שגיאה בתהליך הבדיקה. וודא שהשרת רץ ושכל הקבצים תקינים.');
     } finally {
       setIsGrading(false);
@@ -50,20 +83,48 @@ function App() {
     setError(null);
   };
 
+  const loadExamFromHistory = (exam) => {
+    setResults(exam.results);
+    setExcelFile(exam.excelFile);
+    setError(null);
+  };
+
+  if (!currentUser) {
+    return (
+      <div className="container">
+        <h1>AI Exam Grader 🤖</h1>
+        <p style={{ textAlign: 'center', marginBottom: '2rem', color: '#64748b' }}>
+          מערכת מאובטחת לבדיקת מבחנים
+        </p>
+
+        {authMode === 'login' ? (
+          <Login setMode={setAuthMode} />
+        ) : (
+          <Signup setMode={setAuthMode} />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="container">
+      <header className="app-header">
+        <div className="user-menu">
+          <span className="welcome-msg">שלום, {userProfile?.displayName || 'משתמש'}</span>
+          <button className="history-btn" onClick={() => setShowHistory(true)}>
+            📂 היסטוריה
+          </button>
+          <button className="btn-secondary" onClick={() => logout()}>התנתק</button>
+        </div>
+      </header>
+
       {/* Privacy Notice Banner */}
       <div className="privacy-banner">
-        🔒 הנתונים שלך מעובדים באופן מיידי ולא נשמרים.
+        🔒 הנתונים מוצפנים ונשמרים בענן המאובטח.
         <button className="privacy-link" onClick={() => setShowPrivacy(true)}>
           קרא עוד
         </button>
       </div>
-
-      <h1>AI Exam Grader 🤖</h1>
-      <p style={{ textAlign: 'center', marginBottom: '2rem', color: '#64748b' }}>
-        מערכת אוטומטית לבדיקת מבחנים עם זיהוי רמת ביטחון
-      </p>
 
       <UploadSection onFilesSelected={handleGrade} isGrading={isGrading} />
 
@@ -78,15 +139,28 @@ function App() {
       {results && (
         <div style={{ textAlign: 'center', marginTop: '1rem' }}>
           <button className="clear-btn" onClick={clearResults}>
-            🗑️ מחק תוצאות מהזיכרון
+            🗑️ נקה מסך
           </button>
         </div>
       )}
 
       <PrivacyPolicy isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
+
+      <CloudHistoryModal
+        isOpen={showHistory}
+        onClose={() => setShowHistory(false)}
+        onLoadExam={loadExamFromHistory}
+      />
     </div>
   );
 }
 
-export default App;
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+}
 
+export default App;
