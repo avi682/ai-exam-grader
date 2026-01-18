@@ -5,7 +5,7 @@ import { getFirestore } from "firebase/firestore";
 // DEBUG: Log the config to console to verify it is loaded
 // Hardcoded keys to ensure no loading errors occur.
 const firebaseConfig = {
-    apiKey: "AIzaSyD6ER6oPFwSSectPMNwfCusxzqYl2hTfcg",
+    apiKey: "AlzaSyAJIX81XcT9vZFJa7OL7fAoY4MVCDH5TWU",
     authDomain: "mygrader-7bc03.firebaseapp.com",
     projectId: "mygrader-7bc03",
     storageBucket: "mygrader-7bc03.firebasestorage.app",
