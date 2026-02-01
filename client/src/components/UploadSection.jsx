@@ -50,7 +50,7 @@ export function UploadSection({ onFilesSelected, isGrading }) {
         onFilesSelected({ ...files, rubricText });
     };
 
-    const isReady = files.exam && rubricText.trim().length > 0 && files.submissions.length > 0;
+    const isReady = files.exam && files.submissions.length > 0;
 
     const FileListModal = ({ type, filesList, onClose }) => {
         if (!filesList) return null;
@@ -130,15 +130,15 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                     <input type="file" onChange={(e) => handleFileChange('solvedExam', e)} accept=".pdf,.txt,.md,.docx,.jpg,.jpeg,.png" />
                 </div>
 
-                {/* 3. Rubric */}
+                {/* 3. Rubric (Optional) */}
                 <div className="upload-zone" style={{ gridColumn: '1 / -1' }}>
-                    <h3>3. מחוון / הוראות בדיקה (Rubric)</h3>
-                    <p className="text-dim">כתוב כאן את התשובות הנכונות ואת הניקוד לכל שאלה</p>
+                    <h3>3. מחוון / הוראות בדיקה (אופציונלי)</h3>
+                    <p className="text-dim">אם לא תכתוב מחוון, המערכת תזהה אוטומטית את התשובות הנכונות ואת הניקוד</p>
                     <textarea
                         value={rubricText}
                         onChange={(e) => setRubricText(e.target.value)}
-                        placeholder="שאלה 1: התשובה היא X (10 נקודות)..."
-                        rows={6}
+                        placeholder="אופציונלי: תשובות נכונות, ניקוד מפורט, הערות..."
+                        rows={4}
                         style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
                     />
                 </div>

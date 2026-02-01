@@ -17,36 +17,52 @@ function fileToGenerativePart(buffer, mimeType) {
 async function generateOptimalPrompt(examFileBuffer, examMimeType, solvedExamBuffer, solvedExamMimeType, userRubricText) {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
+    const hasRubric = userRubricText && userRubricText.trim().length > 0;
+    const hasSolvedExam = solvedExamBuffer != null;
+
     const metaPrompt = `
     You are an expert prompt engineer specializing in educational assessment.
     Your task is to analyze the exam provided and generate the PERFECT grading prompt.
 
-    ANALYZE THE EXAM AND CREATE A COMPREHENSIVE GRADING PROMPT THAT INCLUDES:
-    1. **Subject Detection**: Identify the subject (Math, Science, History, etc.)
-    2. **Question Analysis**: List each question, its type (multiple choice, open-ended, calculation, etc.), and point value
-    3. **Answer Key Integration**: If a solved exam is provided, extract the correct answers
-    4. **Grading Criteria**: Create specific criteria for partial credit for each question type
-    5. **Edge Cases**: Handle common student mistakes, alternative correct answers, and ambiguous handwriting
+    CRITICAL ANALYSIS TASKS:
+    1. **Subject Detection**: Identify the subject (Math, Science, History, Hebrew, English, etc.)
+    2. **Question Analysis**: Identify EVERY question, its type (multiple choice, open-ended, calculation, essay, etc.)
+    3. **Point Value Estimation**: ${hasRubric ? 'Use the provided rubric for point values.' : 'ESTIMATE appropriate point values based on question complexity and type. Typical distribution: simple questions 5-10 points, complex questions 15-25 points. Total should be 100 points unless exam states otherwise.'}
+    4. **Answer Key**: ${hasSolvedExam ? 'Extract the correct answers from the solved exam provided.' : 'DETERMINE the correct answers yourself based on your knowledge. You are an expert in this subject - figure out what the correct answers should be.'}
+    5. **Partial Credit Rules**: Define specific criteria for partial credit:
+       - Math: Give partial credit for correct method even if final answer is wrong
+       - Essays: Consider structure, content, language
+       - Multiple choice: No partial credit unless specifically noted
+    6. **Handwriting Handling**: Account for common handwriting issues - if ambiguous, give benefit of the doubt
+    7. **Alternative Answers**: Accept equivalent correct answers (e.g., 0.5 = 1/2 = 50%)
 
-    USER'S GRADING INSTRUCTIONS (incorporate these):
-    ${userRubricText}
+    ${hasRubric ? `USER'S GRADING INSTRUCTIONS (incorporate these):\n    ${userRubricText}` : 'NO RUBRIC PROVIDED - You must determine all grading criteria yourself based on the exam content.'}
 
     OUTPUT FORMAT:
-    Return ONLY a grading prompt (no JSON, no markdown). The prompt should be ready to use directly for grading student submissions.
-    The prompt should be in the SAME LANGUAGE as the exam (if Hebrew exam, Hebrew prompt; if English exam, English prompt).
-    
-    Start your prompt with: "You are an expert grader for [subject] exams..."
-    End with the exact JSON output format required.
+    Return ONLY a complete grading prompt ready to use. The prompt must:
+    - Be in the SAME LANGUAGE as the exam
+    - Include the answer key you determined
+    - Include point values for each question
+    - Include partial credit rules
+    - End with this exact JSON format requirement:
+    {
+        "studentName": "Student Name",
+        "questions": [
+            { "questionId": "1", "score": X, "maxScore": Y, "confidence": 0-100, "comment": "explanation" }
+        ],
+        "totalScore": X,
+        "totalMaxScore": Y
+    }
     `;
 
     const parts = [
         { text: metaPrompt },
-        { text: "Here is the EXAM TEMPLATE to analyze:" },
+        { text: "Here is the EXAM to analyze:" },
         fileToGenerativePart(examFileBuffer, examMimeType)
     ];
 
     if (solvedExamBuffer) {
-        parts.push({ text: "Here is the SOLVED EXAM with correct answers:" });
+        parts.push({ text: "Here is the SOLVED EXAM with correct answers - use these as the answer key:" });
         parts.push(fileToGenerativePart(solvedExamBuffer, solvedExamMimeType));
     }
 
@@ -226,8 +242,8 @@ module.exports = async (req, res) => {
         const rubricText = fields['rubricText'];
         const submissionFiles = files['submissions'] || [];
 
-        if (!examFile || !rubricText || submissionFiles.length === 0) {
-            return res.status(400).json({ error: 'Missing required files or rubric text' });
+        if (!examFile || submissionFiles.length === 0) {
+            return res.status(400).json({ error: 'Missing required files: exam and student submissions' });
         }
 
         // STEP 1: Generate optimal prompt using Prompt Engine
