@@ -13,6 +13,56 @@ function fileToGenerativePart(buffer, mimeType) {
     };
 }
 
+// PROMPT GENERATION ENGINE - Generate optimal grading prompt from exam analysis
+async function generateOptimalPrompt(examFileBuffer, examMimeType, solvedExamBuffer, solvedExamMimeType, userRubricText) {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+
+    const metaPrompt = `
+    You are an expert prompt engineer specializing in educational assessment.
+    Your task is to analyze the exam provided and generate the PERFECT grading prompt.
+
+    ANALYZE THE EXAM AND CREATE A COMPREHENSIVE GRADING PROMPT THAT INCLUDES:
+    1. **Subject Detection**: Identify the subject (Math, Science, History, etc.)
+    2. **Question Analysis**: List each question, its type (multiple choice, open-ended, calculation, etc.), and point value
+    3. **Answer Key Integration**: If a solved exam is provided, extract the correct answers
+    4. **Grading Criteria**: Create specific criteria for partial credit for each question type
+    5. **Edge Cases**: Handle common student mistakes, alternative correct answers, and ambiguous handwriting
+
+    USER'S GRADING INSTRUCTIONS (incorporate these):
+    ${userRubricText}
+
+    OUTPUT FORMAT:
+    Return ONLY a grading prompt (no JSON, no markdown). The prompt should be ready to use directly for grading student submissions.
+    The prompt should be in the SAME LANGUAGE as the exam (if Hebrew exam, Hebrew prompt; if English exam, English prompt).
+    
+    Start your prompt with: "You are an expert grader for [subject] exams..."
+    End with the exact JSON output format required.
+    `;
+
+    const parts = [
+        { text: metaPrompt },
+        { text: "Here is the EXAM TEMPLATE to analyze:" },
+        fileToGenerativePart(examFileBuffer, examMimeType)
+    ];
+
+    if (solvedExamBuffer) {
+        parts.push({ text: "Here is the SOLVED EXAM with correct answers:" });
+        parts.push(fileToGenerativePart(solvedExamBuffer, solvedExamMimeType));
+    }
+
+    try {
+        const result = await model.generateContent(parts);
+        const response = await result.response;
+        const generatedPrompt = response.text();
+
+        console.log("Prompt Engine: Generated optimal prompt successfully");
+        return generatedPrompt;
+    } catch (error) {
+        console.error("Prompt Engine: Failed to generate, using fallback");
+        return null; // Will use default prompt
+    }
+}
+
 // Construct the grading prompt
 function constructOptimizedPrompt(rubricText, hasSolvedExam) {
     const solvedExamNote = hasSolvedExam
@@ -50,11 +100,10 @@ function constructOptimizedPrompt(rubricText, hasSolvedExam) {
     `;
 }
 
-// Grade a single exam
-async function gradeExam(examFileBuffer, examMimeType, rubricText, submissionFileBuffer, submissionMimeType, solvedExamBuffer, solvedExamMimeType) {
+// Grade a single exam using pre-generated prompt
+async function gradeExam(generatedPrompt, examFileBuffer, examMimeType, submissionFileBuffer, submissionMimeType, solvedExamBuffer, solvedExamMimeType) {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-    const hasSolvedExam = solvedExamBuffer != null;
-    const prompt = constructOptimizedPrompt(rubricText, hasSolvedExam);
+    const prompt = generatedPrompt;
 
     const imageParts = [];
 
@@ -181,13 +230,31 @@ module.exports = async (req, res) => {
             return res.status(400).json({ error: 'Missing required files or rubric text' });
         }
 
+        // STEP 1: Generate optimal prompt using Prompt Engine
+        console.log("Step 1: Generating optimal grading prompt...");
+        let optimalPrompt = await generateOptimalPrompt(
+            examFile.buffer,
+            examFile.mimetype,
+            solvedExamFile ? solvedExamFile.buffer : null,
+            solvedExamFile ? solvedExamFile.mimetype : null,
+            rubricText
+        );
+
+        // Fallback to default prompt if generation failed
+        if (!optimalPrompt) {
+            console.log("Using fallback prompt");
+            optimalPrompt = constructOptimizedPrompt(rubricText, solvedExamFile != null);
+        }
+
+        // STEP 2: Grade each submission using the optimal prompt
+        console.log("Step 2: Grading submissions with optimal prompt...");
         const results = [];
 
         for (const submissionFile of submissionFiles) {
             const gradeResult = await gradeExam(
+                optimalPrompt,
                 examFile.buffer,
                 examFile.mimetype,
-                rubricText,
                 submissionFile.buffer,
                 submissionFile.mimetype,
                 solvedExamFile ? solvedExamFile.buffer : null,
