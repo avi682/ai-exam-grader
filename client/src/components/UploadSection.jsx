@@ -64,7 +64,7 @@ export function UploadSection({ onFilesSelected, isGrading }) {
 
     const isReady = files.submissions.length > 0;
 
-    const FileListModal = ({ type, filesList, onClose }) => {
+    const FileListModal = ({ type, filesList, onClose, onRemoveFile }) => {
         if (!filesList) return null;
         const list = Array.isArray(filesList) ? filesList : [filesList];
 
@@ -79,29 +79,35 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                     <h3>{title} ({list.length})</h3>
                     <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                         {list.map((file, idx) => (
-                            <div key={idx} className="file-list-item" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', borderBottom: '1px solid #eee' }}>
-                                <span className="file-icon">📄</span>
-                                <span style={{ direction: 'ltr', textAlign: 'left', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</span>
-                                <span style={{ fontSize: '0.8rem', color: '#64748b', whiteSpace: 'nowrap' }}>
+                            <div key={idx} style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                padding: '12px',
+                                borderBottom: '1px solid #333',
+                                background: '#1e1e1e'
+                            }}>
+                                <span style={{ fontSize: '1.2rem' }}>📄</span>
+                                <span style={{ direction: 'ltr', textAlign: 'left', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', color: '#fff' }}>{file.name}</span>
+                                <span style={{ fontSize: '0.8rem', color: '#888', whiteSpace: 'nowrap' }}>
                                     {(file.size / 1024).toFixed(1)} KB
                                 </span>
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        handleRemoveFile(type, type === 'submissions' ? idx : null);
+                                        onRemoveFile(type, type === 'submissions' ? idx : null);
                                         if (list.length <= 1) onClose();
                                     }}
                                     style={{
                                         background: '#dc2626',
                                         color: 'white',
                                         border: 'none',
-                                        borderRadius: '6px',
-                                        padding: '6px 12px',
+                                        borderRadius: '8px',
+                                        padding: '8px 16px',
                                         cursor: 'pointer',
-                                        fontSize: '1rem',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px'
+                                        fontSize: '1.1rem',
+                                        fontWeight: 'bold',
+                                        minWidth: '50px'
                                     }}
                                     title="מחק קובץ"
                                 >🗑️</button>
@@ -110,7 +116,7 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                     </div>
                     <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '1rem' }}>
                         {type === 'submissions' && list.length > 0 && (
-                            <button className="btn" style={{ background: '#ef4444' }} onClick={() => { handleRemoveFile('submissions'); onClose(); }}>מחק הכל</button>
+                            <button className="btn" style={{ background: '#ef4444' }} onClick={() => { onRemoveFile('submissions'); onClose(); }}>מחק הכל</button>
                         )}
                         <button className="btn close-modal-btn" onClick={onClose}>סגור</button>
                     </div>
@@ -256,6 +262,7 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                                 files.submissions
                     }
                     onClose={() => setShowModal(null)}
+                    onRemoveFile={handleRemoveFile}
                 />
             )}
         </div>
