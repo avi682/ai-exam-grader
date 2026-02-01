@@ -79,20 +79,31 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                     <h3>{title} ({list.length})</h3>
                     <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                         {list.map((file, idx) => (
-                            <div key={idx} className="file-list-item">
+                            <div key={idx} className="file-list-item" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', borderBottom: '1px solid #eee' }}>
                                 <span className="file-icon">📄</span>
-                                <span style={{ direction: 'ltr', textAlign: 'left', flex: 1 }}>{file.name}</span>
-                                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                <span style={{ direction: 'ltr', textAlign: 'left', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</span>
+                                <span style={{ fontSize: '0.8rem', color: '#64748b', whiteSpace: 'nowrap' }}>
                                     {(file.size / 1024).toFixed(1)} KB
                                 </span>
                                 <button
-                                    className="delete-file-btn"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         handleRemoveFile(type, type === 'submissions' ? idx : null);
                                         if (list.length <= 1) onClose();
                                     }}
-                                    style={{ marginLeft: '8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 8px', cursor: 'pointer' }}
+                                    style={{
+                                        background: '#dc2626',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        padding: '6px 12px',
+                                        cursor: 'pointer',
+                                        fontSize: '1rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                    }}
+                                    title="מחק קובץ"
                                 >🗑️</button>
                             </div>
                         ))}
