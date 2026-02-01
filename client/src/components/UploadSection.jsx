@@ -46,6 +46,18 @@ export function UploadSection({ onFilesSelected, isGrading }) {
         }
     };
 
+    // Remove file function
+    const handleRemoveFile = (type, index = null) => {
+        if (type === 'submissions' && index !== null) {
+            setFiles(prev => ({
+                ...prev,
+                submissions: prev.submissions.filter((_, i) => i !== index)
+            }));
+        } else {
+            setFiles(prev => ({ ...prev, [type]: type === 'submissions' ? [] : null }));
+        }
+    };
+
     const handleSubmit = () => {
         onFilesSelected({ ...files, rubricText });
     };
@@ -73,10 +85,24 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                                 <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
                                     {(file.size / 1024).toFixed(1)} KB
                                 </span>
+                                <button
+                                    className="delete-file-btn"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRemoveFile(type, type === 'submissions' ? idx : null);
+                                        if (list.length <= 1) onClose();
+                                    }}
+                                    style={{ marginLeft: '8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 8px', cursor: 'pointer' }}
+                                >🗑️</button>
                             </div>
                         ))}
                     </div>
-                    <button className="btn close-modal-btn" onClick={onClose}>סגור</button>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '1rem' }}>
+                        {type === 'submissions' && list.length > 0 && (
+                            <button className="btn" style={{ background: '#ef4444' }} onClick={() => { handleRemoveFile('submissions'); onClose(); }}>מחק הכל</button>
+                        )}
+                        <button className="btn close-modal-btn" onClick={onClose}>סגור</button>
+                    </div>
                 </div>
             </div>
         );
@@ -99,12 +125,20 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                         {files.exam ? `נבחר: ${files.exam.name}` : 'מומלץ לדיוק טוב יותר'}
                     </p>
                     {files.exam && <div className="file-counter">1</div>}
-                    {files.exam && (
-                        <button className="view-files-btn" onClick={(e) => {
-                            e.preventDefault();
-                            setShowModal('exam');
-                        }}>👁️ הצג קובץ</button>
-                    )}
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                        {files.exam && (
+                            <button className="view-files-btn" onClick={(e) => {
+                                e.preventDefault();
+                                setShowModal('exam');
+                            }}>👁️ הצג</button>
+                        )}
+                        {files.exam && (
+                            <button className="view-files-btn" style={{ background: '#ef4444' }} onClick={(e) => {
+                                e.preventDefault();
+                                handleRemoveFile('exam');
+                            }}>🗑️ מחק</button>
+                        )}
+                    </div>
                     <input type="file" onChange={(e) => handleFileChange('exam', e)} accept=".pdf,.txt,.md,.docx,.jpg,.jpeg,.png" />
                 </div>
 
@@ -116,17 +150,25 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                     onDragOver={(e) => handleDrag('solvedExam', e)}
                     onDrop={(e) => handleDrop('solvedExam', e)}
                 >
-                    <h3>2. מבחן פתור / דוגמה (Optional)</h3>
+                    <h3>2. מבחן פתור / דוגמה (אופציונלי)</h3>
                     <p className="text-dim">
                         {files.solvedExam ? `נבחר: ${files.solvedExam.name}` : 'מומלץ! גרור מבחן פתור לדוגמה'}
                     </p>
                     {files.solvedExam && <div className="file-counter">1</div>}
-                    {files.solvedExam && (
-                        <button className="view-files-btn" onClick={(e) => {
-                            e.preventDefault();
-                            setShowModal('solvedExam');
-                        }}>👁️ הצג קובץ</button>
-                    )}
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                        {files.solvedExam && (
+                            <button className="view-files-btn" onClick={(e) => {
+                                e.preventDefault();
+                                setShowModal('solvedExam');
+                            }}>👁️ הצג</button>
+                        )}
+                        {files.solvedExam && (
+                            <button className="view-files-btn" style={{ background: '#ef4444' }} onClick={(e) => {
+                                e.preventDefault();
+                                handleRemoveFile('solvedExam');
+                            }}>🗑️ מחק</button>
+                        )}
+                    </div>
                     <input type="file" onChange={(e) => handleFileChange('solvedExam', e)} accept=".pdf,.txt,.md,.docx,.jpg,.jpeg,.png" />
                 </div>
 
@@ -152,17 +194,29 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                     onDrop={(e) => handleDrop('submissions', e)}
                     style={{ gridColumn: '1 / -1' }}
                 >
-                    <h3>4. מבחני תלמידים (Submissions)</h3>
+                    <h3>4. מבחני תלמידים (חובה)</h3>
                     <p className="text-dim">
-                        {files.submissions.length > 0 ? `נבחרו ${files.submissions.length} קבצים` : 'גרור תיקייה/קבצים לכאן או לחץ לבחירה'}
+                        {files.submissions.length === 0
+                            ? 'גרור תיקייה/קבצים לכאן או לחץ לבחירה'
+                            : files.submissions.length === 1
+                                ? `נבחר קובץ אחד`
+                                : `נבחרו ${files.submissions.length} קבצים`}
                     </p>
                     {files.submissions.length > 0 && <div className="file-counter">{files.submissions.length}</div>}
-                    {files.submissions.length > 0 && (
-                        <button className="view-files-btn" onClick={(e) => {
-                            e.preventDefault();
-                            setShowModal('submissions');
-                        }}>👁️ הצג רשימה ({files.submissions.length})</button>
-                    )}
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                        {files.submissions.length > 0 && (
+                            <button className="view-files-btn" onClick={(e) => {
+                                e.preventDefault();
+                                setShowModal('submissions');
+                            }}>👁️ הצג רשימה</button>
+                        )}
+                        {files.submissions.length > 0 && (
+                            <button className="view-files-btn" style={{ background: '#ef4444' }} onClick={(e) => {
+                                e.preventDefault();
+                                handleRemoveFile('submissions');
+                            }}>🗑️ מחק הכל</button>
+                        )}
+                    </div>
                     <input
                         type="file"
                         multiple
