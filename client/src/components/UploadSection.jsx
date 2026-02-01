@@ -50,7 +50,7 @@ export function UploadSection({ onFilesSelected, isGrading }) {
         onFilesSelected({ ...files, rubricText });
     };
 
-    const isReady = files.exam && files.submissions.length > 0;
+    const isReady = files.submissions.length > 0;
 
     const FileListModal = ({ type, filesList, onClose }) => {
         if (!filesList) return null;
@@ -86,7 +86,7 @@ export function UploadSection({ onFilesSelected, isGrading }) {
         <div className="card">
             <h2>📄 העלאת קבצים</h2>
             <div className="upload-grid">
-                {/* 1. Blank Exam */}
+                {/* 1. Blank Exam (Optional) */}
                 <div
                     className={`upload-zone ${dragActive.exam ? 'drag-active' : ''} ${files.exam ? 'file-selected' : ''}`}
                     onDragEnter={(e) => handleDrag('exam', e)}
@@ -94,9 +94,9 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                     onDragOver={(e) => handleDrag('exam', e)}
                     onDrop={(e) => handleDrop('exam', e)}
                 >
-                    <h3>1. שאלון המבחן (Exam)</h3>
+                    <h3>1. שאלון המבחן (אופציונלי)</h3>
                     <p className="text-dim">
-                        {files.exam ? `נבחר: ${files.exam.name}` : 'גרור קובץ לכאן או לחץ לבחירה'}
+                        {files.exam ? `נבחר: ${files.exam.name}` : 'מומלץ לדיוק טוב יותר'}
                     </p>
                     {files.exam && <div className="file-counter">1</div>}
                     {files.exam && (
@@ -105,7 +105,7 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                             setShowModal('exam');
                         }}>👁️ הצג קובץ</button>
                     )}
-                    <input type="file" onChange={(e) => handleFileChange('exam', e)} accept=".pdf,.txt,.md,.docx" />
+                    <input type="file" onChange={(e) => handleFileChange('exam', e)} accept=".pdf,.txt,.md,.docx,.jpg,.jpeg,.png" />
                 </div>
 
                 {/* 2. Solved Exam (Optional but Recommended) */}

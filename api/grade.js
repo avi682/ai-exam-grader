@@ -14,15 +14,16 @@ function fileToGenerativePart(buffer, mimeType) {
 }
 
 // PROMPT GENERATION ENGINE - Generate optimal grading prompt from exam analysis
-async function generateOptimalPrompt(examFileBuffer, examMimeType, solvedExamBuffer, solvedExamMimeType, userRubricText) {
+async function generateOptimalPrompt(examFileBuffer, examMimeType, solvedExamBuffer, solvedExamMimeType, userRubricText, firstSubmissionBuffer, firstSubmissionMimeType) {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
     const hasRubric = userRubricText && userRubricText.trim().length > 0;
     const hasSolvedExam = solvedExamBuffer != null;
+    const hasExamTemplate = examFileBuffer != null;
 
     const metaPrompt = `
     You are an expert prompt engineer specializing in educational assessment.
-    Your task is to analyze the exam provided and generate the PERFECT grading prompt.
+    Your task is to analyze the ${hasExamTemplate ? 'exam provided' : 'student submission (to understand the exam structure)'} and generate the PERFECT grading prompt.
 
     CRITICAL ANALYSIS TASKS:
     1. **Subject Detection**: Identify the subject (Math, Science, History, Hebrew, English, etc.)
@@ -55,11 +56,16 @@ async function generateOptimalPrompt(examFileBuffer, examMimeType, solvedExamBuf
     }
     `;
 
-    const parts = [
-        { text: metaPrompt },
-        { text: "Here is the EXAM to analyze:" },
-        fileToGenerativePart(examFileBuffer, examMimeType)
-    ];
+    const parts = [{ text: metaPrompt }];
+
+    // Use exam template if available, otherwise use first student submission to understand structure
+    if (hasExamTemplate) {
+        parts.push({ text: "Here is the EXAM TEMPLATE to analyze:" });
+        parts.push(fileToGenerativePart(examFileBuffer, examMimeType));
+    } else if (firstSubmissionBuffer) {
+        parts.push({ text: "No exam template provided. Analyze this STUDENT SUBMISSION to understand the exam structure and questions:" });
+        parts.push(fileToGenerativePart(firstSubmissionBuffer, firstSubmissionMimeType));
+    }
 
     if (solvedExamBuffer) {
         parts.push({ text: "Here is the SOLVED EXAM with correct answers - use these as the answer key:" });
@@ -242,18 +248,21 @@ module.exports = async (req, res) => {
         const rubricText = fields['rubricText'];
         const submissionFiles = files['submissions'] || [];
 
-        if (!examFile || submissionFiles.length === 0) {
-            return res.status(400).json({ error: 'Missing required files: exam and student submissions' });
+        if (submissionFiles.length === 0) {
+            return res.status(400).json({ error: 'Missing required files: student submissions' });
         }
 
         // STEP 1: Generate optimal prompt using Prompt Engine
         console.log("Step 1: Generating optimal grading prompt...");
+        const firstSubmission = submissionFiles[0];
         let optimalPrompt = await generateOptimalPrompt(
-            examFile.buffer,
-            examFile.mimetype,
+            examFile ? examFile.buffer : null,
+            examFile ? examFile.mimetype : null,
             solvedExamFile ? solvedExamFile.buffer : null,
             solvedExamFile ? solvedExamFile.mimetype : null,
-            rubricText
+            rubricText || '',
+            firstSubmission.buffer,
+            firstSubmission.mimetype
         );
 
         // Fallback to default prompt if generation failed
@@ -269,8 +278,8 @@ module.exports = async (req, res) => {
         for (const submissionFile of submissionFiles) {
             const gradeResult = await gradeExam(
                 optimalPrompt,
-                examFile.buffer,
-                examFile.mimetype,
+                examFile ? examFile.buffer : null,
+                examFile ? examFile.mimetype : null,
                 submissionFile.buffer,
                 submissionFile.mimetype,
                 solvedExamFile ? solvedExamFile.buffer : null,
