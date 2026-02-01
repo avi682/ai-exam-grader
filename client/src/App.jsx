@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { UploadSection } from './components/UploadSection';
 import { ResultsTable } from './components/ResultsTable';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
-import { HistoryModal } from './components/HistoryModal';
-import { historyService } from './services/historyService';
 
 function App() {
   const [results, setResults] = useState(null);
@@ -11,7 +9,6 @@ function App() {
   const [isGrading, setIsGrading] = useState(false);
   const [error, setError] = useState(null);
   const [showPrivacy, setShowPrivacy] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
 
   const handleGrade = async (files) => {
     setIsGrading(true);
@@ -42,21 +39,6 @@ function App() {
       setResults(data.results);
       setExcelFile(data.excelFile);
 
-      // Save to Local History automatically
-      try {
-        const examData = {
-          id: Date.now().toString(),
-          timestamp: new Date().toISOString(),
-          results: data.results,
-          excelFile: data.excelFile,
-          studentCount: data.results.length,
-          averageScore: Math.round(data.results.reduce((sum, r) => sum + (r.totalScore || 0), 0) / data.results.length)
-        };
-        historyService.saveExam(examData);
-      } catch (e) {
-        console.error("Local save failed", e);
-      }
-
     } catch (err) {
       setError('שגיאה בתהליך הבדיקה. וודא שהשרת רץ ושכל הקבצים תקינים.');
       console.error(err);
@@ -71,22 +53,11 @@ function App() {
     setError(null);
   };
 
-  const loadExamFromHistory = (exam) => {
-    setResults(exam.results);
-    setExcelFile(exam.excelFile);
-    setError(null);
-  };
-
   return (
     <div className="container">
       <header className="app-header">
         <div className="user-menu" style={{ justifyContent: 'center', width: '100%' }}>
           <h1 style={{ fontSize: '1.5rem', margin: 0 }}>🤖 AI Exam Grader</h1>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
-            <button className="history-btn" onClick={() => setShowHistory(true)}>
-              📂 היסטוריה
-            </button>
-          </div>
         </div>
       </header>
 
@@ -117,12 +88,6 @@ function App() {
       )}
 
       <PrivacyPolicy isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
-
-      <HistoryModal
-        isOpen={showHistory}
-        onClose={() => setShowHistory(false)}
-        onLoadExam={loadExamFromHistory}
-      />
     </div>
   );
 }
