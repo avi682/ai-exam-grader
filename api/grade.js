@@ -14,10 +14,15 @@ function fileToGenerativePart(buffer, mimeType) {
 }
 
 // Construct the grading prompt
-function constructOptimizedPrompt(rubricText) {
+function constructOptimizedPrompt(rubricText, hasSolvedExam) {
+    const solvedExamNote = hasSolvedExam
+        ? `\n    IMPORTANT: You have been provided with a SOLVED EXAM showing the correct answers. Use this as your primary reference for grading. Compare the student's answers against the solved exam.`
+        : '';
+
     return `
     You are an expert academic grader with advanced handwriting recognition capabilities.
     Your goal is to grade a student's handwritten exam submission with extreme precision.
+    ${solvedExamNote}
 
     GRADING RUBRIC & INSTRUCTIONS:
     ${rubricText}
@@ -25,9 +30,10 @@ function constructOptimizedPrompt(rubricText) {
     STEP-BY-STEP REASONING (Internal Monologue):
     1. **Scan & Transcribe**: First, carefully read the handwritten student submission. If a word is ambiguous, look at the context.
     2. **Locate Student Name**: Find the student's name at the top of the document.
-    3. **Evaluate per Question**: Match each student answer to the corresponding rubric item.
-    4. **Score & Verify**: Assign points. If you are deducted points, verify against the rubric.
-    5. **Assess Confidence**:
+    3. **Compare to Correct Answers**: If a solved exam is provided, compare each student answer to the correct answer.
+    4. **Evaluate per Question**: Match each student answer to the corresponding rubric item.
+    5. **Score & Verify**: Assign points. If you deduct points, explain why based on the rubric or solved exam.
+    6. **Assess Confidence**:
        - High Confidence (95-100%): Handwriting is legible, answer is clear.
        - Low Confidence (<95%): Handwriting is illegible, ambiguity in meaning, or page is blurry.
 
@@ -45,20 +51,28 @@ function constructOptimizedPrompt(rubricText) {
 }
 
 // Grade a single exam
-async function gradeExam(examFileBuffer, examMimeType, rubricText, submissionFileBuffer, submissionMimeType) {
+async function gradeExam(examFileBuffer, examMimeType, rubricText, submissionFileBuffer, submissionMimeType, solvedExamBuffer, solvedExamMimeType) {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-    const prompt = constructOptimizedPrompt(rubricText);
+    const hasSolvedExam = solvedExamBuffer != null;
+    const prompt = constructOptimizedPrompt(rubricText, hasSolvedExam);
 
-    const imageParts = [
-        fileToGenerativePart(submissionFileBuffer, submissionMimeType)
-    ];
+    const imageParts = [];
 
+    // Add blank exam template
     if (examFileBuffer) {
-        imageParts.unshift(fileToGenerativePart(examFileBuffer, examMimeType));
-        imageParts.unshift({ text: "Here is the BLANK EXAM TEMPLATE for reference:" });
+        imageParts.push({ text: "Here is the BLANK EXAM TEMPLATE for reference:" });
+        imageParts.push(fileToGenerativePart(examFileBuffer, examMimeType));
     }
 
+    // Add solved exam with correct answers
+    if (solvedExamBuffer) {
+        imageParts.push({ text: "Here is the SOLVED EXAM with CORRECT ANSWERS - use this as the answer key:" });
+        imageParts.push(fileToGenerativePart(solvedExamBuffer, solvedExamMimeType));
+    }
+
+    // Add student submission
     imageParts.push({ text: "Here is the STUDENT SUBMISSION to grade:" });
+    imageParts.push(fileToGenerativePart(submissionFileBuffer, submissionMimeType));
 
     const parts = [
         { text: prompt },
