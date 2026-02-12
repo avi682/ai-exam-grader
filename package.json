@@ -7,5 +7,11 @@
         "server": "node server/index.js",
         "build": "cd client && npm run build",
         "install-all": "npm install && cd client && npm install && cd ../api && npm install"
+    },
+    "dependencies": {
+        "@google/generative-ai": "^0.2.1",
+        "busboy": "^1.6.0",
+        "xlsx": "^0.18.5",
+        "dotenv": "^16.4.1"
     }
 }
