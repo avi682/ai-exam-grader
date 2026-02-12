@@ -15,7 +15,10 @@ export function UploadSection({ onFilesSelected, isGrading }) {
         const selectedFiles = e.target.files;
         if (selectedFiles && selectedFiles.length > 0) {
             if (type === 'submissions') {
-                setFiles(prev => ({ ...prev, [type]: Array.from(selectedFiles) }));
+                setFiles(prev => ({
+                    ...prev,
+                    [type]: [...prev.submissions, ...Array.from(selectedFiles)]
+                }));
             } else {
                 setFiles(prev => ({ ...prev, [type]: selectedFiles[0] }));
             }
@@ -40,7 +43,10 @@ export function UploadSection({ onFilesSelected, isGrading }) {
         const droppedFiles = e.dataTransfer.files;
         if (droppedFiles && droppedFiles.length > 0) {
             if (type === 'submissions') {
-                setFiles(prev => ({ ...prev, [type]: Array.from(droppedFiles) }));
+                setFiles(prev => ({
+                    ...prev,
+                    [type]: [...prev.submissions, ...Array.from(droppedFiles)]
+                }));
             } else {
                 setFiles(prev => ({ ...prev, [type]: droppedFiles[0] }));
             }
