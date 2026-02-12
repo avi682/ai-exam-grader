@@ -2,7 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
-const { gradeExam } = require('./services/geminiService');
+const { gradeExam, generateOptimalPrompt, constructOptimizedPrompt } = require('./services/geminiService');
 const { generateExcel } = require('./services/excelGenerator');
 
 require('dotenv').config();
@@ -19,34 +19,53 @@ const upload = multer({ storage: storage });
 
 app.post('/api/grade', upload.fields([
     { name: 'exam', maxCount: 1 },
-    // rubric is now sent as text field, not file
-    { name: 'submissions', maxCount: 50 } // Allow multiple submissions
+    { name: 'solvedExam', maxCount: 1 },
+    { name: 'submissions', maxCount: 50 }
 ]), async (req, res) => {
     try {
         const examFile = req.files['exam'] ? req.files['exam'][0] : null;
+        const solvedExamFile = req.files['solvedExam'] ? req.files['solvedExam'][0] : null; // Support solved exam
         const rubricText = req.body.rubricText;
+        const specialInstructions = req.body.specialInstructions; // Support special instructions
         const submissionFiles = req.files['submissions'] || [];
 
-        if (!examFile || !rubricText || submissionFiles.length === 0) {
-            return res.status(400).json({ error: 'Missing required files (exam, submissions) or rubric text' });
+        // Only submissions are strictly required now
+        if (submissionFiles.length === 0) {
+            return res.status(400).json({ error: 'Missing required files: student submissions' });
         }
 
+        console.log("Step 1: Generating optimal grading prompt...");
+        const firstSubmission = submissionFiles[0];
+        let optimalPrompt = await generateOptimalPrompt(
+            examFile ? examFile.buffer : null,
+            examFile ? examFile.mimetype : null,
+            solvedExamFile ? solvedExamFile.buffer : null,
+            solvedExamFile ? solvedExamFile.mimetype : null,
+            rubricText || '',
+            specialInstructions || '',
+            firstSubmission.buffer,
+            firstSubmission.mimetype
+        );
+
+        if (!optimalPrompt) {
+            console.log("Using fallback prompt");
+            optimalPrompt = constructOptimizedPrompt(rubricText, specialInstructions, solvedExamFile != null);
+        }
+
+        console.log("Step 2: Grading submissions...");
         const results = [];
 
-        // 2. Process each submission
         for (const submissionFile of submissionFiles) {
-            // Privacy: No logging of file names
-
-            // Pass raw file buffers to Gemini (Multimodal)
             const gradeResult = await gradeExam(
-                examFile.buffer,
-                examFile.mimetype,
-                rubricText,
+                optimalPrompt,
+                examFile ? examFile.buffer : null,
+                examFile ? examFile.mimetype : null,
                 submissionFile.buffer,
-                submissionFile.mimetype
+                submissionFile.mimetype,
+                solvedExamFile ? solvedExamFile.buffer : null,
+                solvedExamFile ? solvedExamFile.mimetype : null
             );
 
-            // Use extracted name from Gemini, or fallback to filename if unknown/empty
             let finalStudentName = gradeResult.studentName;
             if (!finalStudentName || finalStudentName === "Unknown" || finalStudentName === "Error") {
                 finalStudentName = submissionFile.originalname.replace(/\.[^/.]+$/, "");
@@ -58,10 +77,8 @@ app.post('/api/grade', upload.fields([
             });
         }
 
-        // 4. Generate Excel
         const excelBuffer = generateExcel(results);
 
-        // 5. Build response
         res.json({
             results,
             excelFile: excelBuffer.toString('base64')

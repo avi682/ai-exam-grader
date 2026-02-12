@@ -14,38 +14,41 @@ function fileToGenerativePart(buffer, mimeType) {
 }
 
 // PROMPT GENERATION ENGINE - Generate optimal grading prompt from exam analysis
-async function generateOptimalPrompt(examFileBuffer, examMimeType, solvedExamBuffer, solvedExamMimeType, userRubricText, firstSubmissionBuffer, firstSubmissionMimeType) {
+async function generateOptimalPrompt(examFileBuffer, examMimeType, solvedExamBuffer, solvedExamMimeType, userRubricText, specialInstructions, firstSubmissionBuffer, firstSubmissionMimeType) {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
     const hasRubric = userRubricText && userRubricText.trim().length > 0;
     const hasSolvedExam = solvedExamBuffer != null;
     const hasExamTemplate = examFileBuffer != null;
+    const hasSpecialInstructions = specialInstructions && specialInstructions.trim().length > 0;
 
     const metaPrompt = `
-    You are an expert prompt engineer specializing in educational assessment.
-    Your task is to analyze the ${hasExamTemplate ? 'exam provided' : 'student submission (to understand the exam structure)'} and generate the PERFECT grading prompt.
+    You are an expert prompt engineer and dedicated teaching assistant.
+    Your goal is to analyze the provided documents and generate the PERFECT grading prompt for an AI that will grade student submissions.
 
-    CRITICAL ANALYSIS TASKS:
-    1. **Subject Detection**: Identify the subject (Math, Science, History, Hebrew, English, etc.)
-    2. **Question Analysis**: Identify EVERY question, its type (multiple choice, open-ended, calculation, essay, etc.)
-    3. **Point Value Estimation**: ${hasRubric ? 'Use the provided rubric for point values.' : 'ESTIMATE appropriate point values based on question complexity and type. Typical distribution: simple questions 5-10 points, complex questions 15-25 points. Total should be 100 points unless exam states otherwise.'}
-    4. **Answer Key**: ${hasSolvedExam ? 'Extract the correct answers from the solved exam provided.' : 'DETERMINE the correct answers yourself based on your knowledge. You are an expert in this subject - figure out what the correct answers should be.'}
-    5. **Partial Credit Rules**: Define specific criteria for partial credit:
-       - Math: Give partial credit for correct method even if final answer is wrong
-       - Essays: Consider structure, content, language
-       - Multiple choice: No partial credit unless specifically noted
-    6. **Handwriting Handling**: Account for common handwriting issues - if ambiguous, give benefit of the doubt
-    7. **Alternative Answers**: Accept equivalent correct answers (e.g., 0.5 = 1/2 = 50%)
+    --- DOCUMENT ANALYSIS ---
+    1. **Analyze the Exam Template** (if provided): Identify the subject, grade level, and list of questions.
+    2. **Analyze the Solved Exam** (if provided): Extract the correct answers.
+    3. **Analyze the Student Submission** (if provided): Use this to understand the exam structure if the template is missing.
 
-    ${hasRubric ? `USER'S GRADING INSTRUCTIONS (incorporate these):\n    ${userRubricText}` : 'NO RUBRIC PROVIDED - You must determine all grading criteria yourself based on the exam content.'}
+    --- MISSING INFORMATION HANDLING ---
+    ${!hasSolvedExam ? 'CRITICAL: NO SOLVED EXAM/ANSWER KEY PROVIDED. You must determine the correct answers yourself based on your expert knowledge of the subject. The grading prompt MUST include these correct answers.' : 'Use the provided Solved Exam as the source of truth.'}
+    ${!hasRubric ? 'CRITICAL: NO RUBRIC PROVIDED. You must determine the point distribution (total 100) and grading criteria yourself. Assign logical points based on question complexity.' : 'Use the provided Rubric for point values and criteria.'}
 
-    OUTPUT FORMAT:
-    Return ONLY a complete grading prompt ready to use. The prompt must:
-    - Be in the SAME LANGUAGE as the exam
-    - Include the answer key you determined
-    - Include point values for each question
-    - Include partial credit rules
-    - End with this exact JSON format requirement:
+    --- USER INSTRUCTIONS ---
+    ${hasSpecialInstructions ? `THE USER HAS PROVIDED THESE SPECIAL INSTRUCTIONS. THESE ARE PARAMOUNT:\n"${specialInstructions}"\n(Incorporate these primarily into the grading logic)` : 'No special instructions provided.'}
+    ${hasRubric ? `User's Rubric:\n"${userRubricText}"` : ''}
+
+    --- OUTPUT TASK ---
+    Write a comprehensive grading prompt for the AI grader. The prompt should:
+    1.  **Role**: Define the AI as an expert grader.
+    2.  **Context**: Briefly describe the exam subject and structure.
+    3.  **Answer Key**: EXPLICITLY LIST the correct answers for every question (derived from your analysis or the solved exam).
+    4.  **Grading Criteria**: Explain how to grade each question (partial credit, key keywords, common mistakes).
+    5.  **Special Handling**: Incorporate the user's special instructions (e.g., specific question filters, strictness levels).
+    6.  **Output Format**: Enforce the required JSON structure.
+
+    REQUIRED JSON STRUCTURE FOR THE FINAL PROMPT OUTPUT:
     {
         "studentName": "Student Name",
         "questions": [
@@ -85,29 +88,32 @@ async function generateOptimalPrompt(examFileBuffer, examMimeType, solvedExamBuf
     }
 }
 
-// Construct the grading prompt
-function constructOptimizedPrompt(rubricText, hasSolvedExam) {
+// Construct the grading prompt (Fallback)
+function constructOptimizedPrompt(rubricText, specialInstructions, hasSolvedExam) {
     const solvedExamNote = hasSolvedExam
-        ? `\n    IMPORTANT: You have been provided with a SOLVED EXAM showing the correct answers. Use this as your primary reference for grading. Compare the student's answers against the solved exam.`
+        ? `\n    IMPORTANT: A SOLVED EXAM is provided. Use it as your primary reference for correct answers.`
+        : `\n    IMPORTANT: NO SOLVED EXAM PROVIDED. You must determine the correct answers yourself based on the content.`;
+
+    const specialInstructionsNote = specialInstructions
+        ? `\n    USER SPECIAL INSTRUCTIONS (OVERRIDE DEFAULT RULES):\n    ${specialInstructions}`
         : '';
 
     return `
     You are an expert academic grader with advanced handwriting recognition capabilities.
     Your goal is to grade a student's handwritten exam submission with extreme precision.
     ${solvedExamNote}
+    ${specialInstructionsNote}
 
     GRADING RUBRIC & INSTRUCTIONS:
-    ${rubricText}
+    ${rubricText || 'No specific rubric provided. Use your best judgment for standard academic grading.'}
 
     STEP-BY-STEP REASONING (Internal Monologue):
     1. **Scan & Transcribe**: First, carefully read the handwritten student submission. If a word is ambiguous, look at the context.
     2. **Locate Student Name**: Find the student's name at the top of the document.
-    3. **Compare to Correct Answers**: If a solved exam is provided, compare each student answer to the correct answer.
+    3. **Determine Correct Answers**: Compare against the solved exam (if present) or strictly derive the correct answer yourself.
     4. **Evaluate per Question**: Match each student answer to the corresponding rubric item.
     5. **Score & Verify**: Assign points. If you deduct points, explain why based on the rubric or solved exam.
-    6. **Assess Confidence**:
-       - High Confidence (95-100%): Handwriting is legible, answer is clear.
-       - Low Confidence (<95%): Handwriting is illegible, ambiguity in meaning, or page is blurry.
+    6. **Check Special Instructions**: Ensure you followed any special constraints set by the user (e.g., checking only prime questions).
 
     OUTPUT FORMAT:
     Return pure JSON.
@@ -246,6 +252,7 @@ module.exports = async (req, res) => {
         const examFile = files['exam'] ? files['exam'][0] : null;
         const solvedExamFile = files['solvedExam'] ? files['solvedExam'][0] : null;
         const rubricText = fields['rubricText'];
+        const specialInstructions = fields['specialInstructions'];
         const submissionFiles = files['submissions'] || [];
 
         if (submissionFiles.length === 0) {
@@ -261,6 +268,7 @@ module.exports = async (req, res) => {
             solvedExamFile ? solvedExamFile.buffer : null,
             solvedExamFile ? solvedExamFile.mimetype : null,
             rubricText || '',
+            specialInstructions || '',
             firstSubmission.buffer,
             firstSubmission.mimetype
         );
@@ -268,7 +276,7 @@ module.exports = async (req, res) => {
         // Fallback to default prompt if generation failed
         if (!optimalPrompt) {
             console.log("Using fallback prompt");
-            optimalPrompt = constructOptimizedPrompt(rubricText, solvedExamFile != null);
+            optimalPrompt = constructOptimizedPrompt(rubricText, specialInstructions, solvedExamFile != null);
         }
 
         // STEP 2: Grade each submission using the optimal prompt
@@ -305,7 +313,7 @@ module.exports = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error processing request');
+        console.error('Error processing request', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };

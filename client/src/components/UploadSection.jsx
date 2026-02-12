@@ -7,6 +7,7 @@ export function UploadSection({ onFilesSelected, isGrading }) {
         submissions: []
     });
     const [rubricText, setRubricText] = useState('');
+    const [specialInstructions, setSpecialInstructions] = useState('');
     const [dragActive, setDragActive] = useState({ exam: false, solvedExam: false, submissions: false });
     const [showModal, setShowModal] = useState(null); // 'exam', 'solvedExam', 'submissions' or null
 
@@ -59,7 +60,7 @@ export function UploadSection({ onFilesSelected, isGrading }) {
     };
 
     const handleSubmit = () => {
-        onFilesSelected({ ...files, rubricText });
+        onFilesSelected({ ...files, rubricText, specialInstructions });
     };
 
     const isReady = files.submissions.length > 0;
@@ -199,6 +200,19 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                         placeholder="אופציונלי: תשובות נכונות, ניקוד מפורט, הערות..."
                         rows={4}
                         style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                </div>
+
+                {/* 3.5 Special Instructions */}
+                <div className="upload-zone special-instructions-zone" style={{ gridColumn: '1 / -1' }}>
+                    <h3>📝 הוראות מיוחדות (אופציונלי)</h3>
+                    <p className="text-dim">כתוב כאן הנחיות מיוחדות ל-AI, למשל: תשובות, סינון שאלות, דגשים מיוחדים</p>
+                    <textarea
+                        value={specialInstructions}
+                        onChange={(e) => setSpecialInstructions(e.target.value)}
+                        placeholder={'דוגמאות:\n• "התשובות לשאלה 3: א. 42, ב. 17, ג. 8"\n• "בדוק רק שאלות עם מספר ראשוני (2,3,5,7...)"\n• "אל תוריד נקודות על שגיאות כתיב"\n• "תן ניקוד חלקי על דרך פתרון נכונה גם אם התשובה הסופית שגויה"'}
+                        rows={5}
+                        className="special-instructions-textarea"
                     />
                 </div>
 

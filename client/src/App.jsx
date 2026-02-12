@@ -20,7 +20,8 @@ function App() {
     if (files.solvedExam) {
       formData.append('solvedExam', files.solvedExam);
     }
-    formData.append('rubricText', files.rubricText);
+    formData.append('rubricText', files.rubricText || '');
+    formData.append('specialInstructions', files.specialInstructions || '');
     files.submissions.forEach(file => {
       formData.append('submissions', file);
     });
