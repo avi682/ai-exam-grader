@@ -15,11 +15,11 @@ function fileToGenerativePart(buffer, mimeType) {
 }
 
 // PROMPT GENERATION ENGINE - Generate optimal grading prompt from exam analysis
-async function generateOptimalPrompt(examFileBuffer, examMimeType, solvedExamBuffer, solvedExamMimeType, userRubricText, specialInstructions, firstSubmissionBuffer, firstSubmissionMimeType) {
+async function generateOptimalPrompt(examFileBuffer, examMimeType, solvedExamFiles, userRubricText, specialInstructions, firstSubmissionBuffer, firstSubmissionMimeType) {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
     const hasRubric = userRubricText && userRubricText.trim().length > 0;
-    const hasSolvedExam = solvedExamBuffer != null;
+    const hasSolvedExam = solvedExamFiles && solvedExamFiles.length > 0;
     const hasExamTemplate = examFileBuffer != null;
     const hasSpecialInstructions = specialInstructions && specialInstructions.trim().length > 0;
 
@@ -29,11 +29,11 @@ async function generateOptimalPrompt(examFileBuffer, examMimeType, solvedExamBuf
 
     --- DOCUMENT ANALYSIS ---
     1. **Analyze the Exam Template** (if provided): Identify the subject, grade level, and list of questions.
-    2. **Analyze the Solved Exam** (if provided): Extract the correct answers.
+    2. **Analyze the Solved Exams** (if provided): Extract the correct answers. Multiple solved exams or examples might be provided; synthesize the correct answers from all of them.
     3. **Analyze the Student Submission** (if provided): Use this to understand the exam structure if the template is missing.
 
     --- MISSING INFORMATION HANDLING ---
-    ${!hasSolvedExam ? 'CRITICAL: NO SOLVED EXAM/ANSWER KEY PROVIDED. You must determine the correct answers yourself based on your expert knowledge of the subject. The grading prompt MUST include these correct answers.' : 'Use the provided Solved Exam as the source of truth.'}
+    ${!hasSolvedExam ? 'CRITICAL: NO SOLVED EXAM/ANSWER KEY PROVIDED. You must determine the correct answers yourself based on your expert knowledge of the subject. The grading prompt MUST include these correct answers.' : 'Use the provided Solved Exam(s) as the source of truth.'}
     ${!hasRubric ? 'CRITICAL: NO RUBRIC PROVIDED. You must determine the point distribution (total 100) and grading criteria yourself. Assign logical points based on question complexity.' : 'Use the provided Rubric for point values and criteria.'}
 
     --- USER INSTRUCTIONS ---
@@ -44,7 +44,7 @@ async function generateOptimalPrompt(examFileBuffer, examMimeType, solvedExamBuf
     Write a comprehensive grading prompt for the AI grader. The prompt should:
     1.  **Role**: Define the AI as an expert grader.
     2.  **Context**: Briefly describe the exam subject and structure.
-    3.  **Answer Key**: EXPLICITLY LIST the correct answers for every question (derived from your analysis or the solved exam).
+    3.  **Answer Key**: EXPLICITLY LIST the correct answers for every question (derived from your analysis or the solved exams).
     4.  **Grading Criteria**: Explain how to grade each question (partial credit, key keywords, common mistakes).
     5.  **Special Handling**: Incorporate the user's special instructions (e.g., specific question filters, strictness levels).
     6.  **Output Format**: Enforce the required JSON structure.
@@ -71,9 +71,11 @@ async function generateOptimalPrompt(examFileBuffer, examMimeType, solvedExamBuf
         parts.push(fileToGenerativePart(firstSubmissionBuffer, firstSubmissionMimeType));
     }
 
-    if (solvedExamBuffer) {
-        parts.push({ text: "Here is the SOLVED EXAM with correct answers - use these as the answer key:" });
-        parts.push(fileToGenerativePart(solvedExamBuffer, solvedExamMimeType));
+    if (hasSolvedExam) {
+        solvedExamFiles.forEach((file, index) => {
+            parts.push({ text: `Here is SOLVED EXAM #${index + 1} with correct answers - use this as the answer key:` });
+            parts.push(fileToGenerativePart(file.buffer, file.mimetype));
+        });
     }
 
     try {
@@ -92,7 +94,7 @@ async function generateOptimalPrompt(examFileBuffer, examMimeType, solvedExamBuf
 // Construct the grading prompt (Fallback)
 function constructOptimizedPrompt(rubricText, specialInstructions, hasSolvedExam) {
     const solvedExamNote = hasSolvedExam
-        ? `\n    IMPORTANT: A SOLVED EXAM is provided. Use it as your primary reference for correct answers.`
+        ? `\n    IMPORTANT: SOLVED EXAM(S) provided. Use them as your primary reference for correct answers.`
         : `\n    IMPORTANT: NO SOLVED EXAM PROVIDED. You must determine the correct answers yourself based on the content.`;
 
     const specialInstructionsNote = specialInstructions
@@ -111,7 +113,7 @@ function constructOptimizedPrompt(rubricText, specialInstructions, hasSolvedExam
     STEP-BY-STEP REASONING (Internal Monologue):
     1. **Scan & Transcribe**: First, carefully read the handwritten student submission. If a word is ambiguous, look at the context.
     2. **Locate Student Name**: Find the student's name at the top of the document.
-    3. **Determine Correct Answers**: Compare against the solved exam (if present) or strictly derive the correct answer yourself.
+    3. **Determine Correct Answers**: Compare against the solved exam(s) (if present) or strictly derive the correct answer yourself.
     4. **Evaluate per Question**: Match each student answer to the corresponding rubric item.
     5. **Score & Verify**: Assign points. If you deduct points, explain why based on the rubric or solved exam.
     6. **Check Special Instructions**: Ensure you followed any special constraints set by the user (e.g., checking only prime questions).
@@ -129,7 +131,7 @@ function constructOptimizedPrompt(rubricText, specialInstructions, hasSolvedExam
     `;
 }
 
-async function gradeExam(generatedPrompt, examFileBuffer, examMimeType, submissionFileBuffer, submissionMimeType, solvedExamBuffer, solvedExamMimeType) {
+async function gradeExam(generatedPrompt, examFileBuffer, examMimeType, submissionFileBuffer, submissionMimeType, solvedExamFiles) {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
     const prompt = generatedPrompt;
 
@@ -141,10 +143,12 @@ async function gradeExam(generatedPrompt, examFileBuffer, examMimeType, submissi
         imageParts.push(fileToGenerativePart(examFileBuffer, examMimeType));
     }
 
-    // Add solved exam with correct answers
-    if (solvedExamBuffer) {
-        imageParts.push({ text: "Here is the SOLVED EXAM with CORRECT ANSWERS - use this as the answer key:" });
-        imageParts.push(fileToGenerativePart(solvedExamBuffer, solvedExamMimeType));
+    // Add solved exams with correct answers
+    if (solvedExamFiles && solvedExamFiles.length > 0) {
+        solvedExamFiles.forEach((file, index) => {
+            imageParts.push({ text: `Here is SOLVED EXAM #${index + 1} with CORRECT ANSWERS - use this as the answer key:` });
+            imageParts.push(fileToGenerativePart(file.buffer, file.mimetype));
+        });
     }
 
     // Add student submission
@@ -165,13 +169,13 @@ async function gradeExam(generatedPrompt, examFileBuffer, examMimeType, submissi
         return JSON.parse(jsonStr);
 
     } catch (error) {
-        console.error("Grading error occurred");
+        console.error("Grading error occurred", error);
         return {
             studentName: "Error",
             questions: [],
             totalScore: 0,
             totalMaxScore: 0,
-            error: "Failed to grade submission"
+            error: "Failed to grade submission: " + error.message
         };
     }
 }

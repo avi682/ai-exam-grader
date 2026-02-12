@@ -3,7 +3,7 @@ import React, { useCallback, useState } from 'react';
 export function UploadSection({ onFilesSelected, isGrading }) {
     const [files, setFiles] = useState({
         exam: null,
-        solvedExam: null,
+        solvedExam: [], // Changed to array
         submissions: []
     });
     const [rubricText, setRubricText] = useState('');
@@ -14,10 +14,10 @@ export function UploadSection({ onFilesSelected, isGrading }) {
     const handleFileChange = (type, e) => {
         const selectedFiles = e.target.files;
         if (selectedFiles && selectedFiles.length > 0) {
-            if (type === 'submissions') {
+            if (type === 'submissions' || type === 'solvedExam') {
                 setFiles(prev => ({
                     ...prev,
-                    [type]: [...prev.submissions, ...Array.from(selectedFiles)]
+                    [type]: [...(prev[type] || []), ...Array.from(selectedFiles)]
                 }));
             } else {
                 setFiles(prev => ({ ...prev, [type]: selectedFiles[0] }));
@@ -42,10 +42,10 @@ export function UploadSection({ onFilesSelected, isGrading }) {
 
         const droppedFiles = e.dataTransfer.files;
         if (droppedFiles && droppedFiles.length > 0) {
-            if (type === 'submissions') {
+            if (type === 'submissions' || type === 'solvedExam') {
                 setFiles(prev => ({
                     ...prev,
-                    [type]: [...prev.submissions, ...Array.from(droppedFiles)]
+                    [type]: [...(prev[type] || []), ...Array.from(droppedFiles)]
                 }));
             } else {
                 setFiles(prev => ({ ...prev, [type]: droppedFiles[0] }));
@@ -55,13 +55,13 @@ export function UploadSection({ onFilesSelected, isGrading }) {
 
     // Remove file function
     const handleRemoveFile = (type, index = null) => {
-        if (type === 'submissions' && index !== null) {
+        if ((type === 'submissions' || type === 'solvedExam') && index !== null) {
             setFiles(prev => ({
                 ...prev,
-                submissions: prev.submissions.filter((_, i) => i !== index)
+                [type]: prev[type].filter((_, i) => i !== index)
             }));
         } else {
-            setFiles(prev => ({ ...prev, [type]: type === 'submissions' ? [] : null }));
+            setFiles(prev => ({ ...prev, [type]: (type === 'submissions' || type === 'solvedExam') ? [] : null }));
         }
     };
 
@@ -122,8 +122,8 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                         ))}
                     </div>
                     <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '1rem' }}>
-                        {type === 'submissions' && list.length > 0 && (
-                            <button className="btn" style={{ background: '#ef4444' }} onClick={() => { onRemoveFile('submissions'); onClose(); }}>מחק הכל</button>
+                        {(type === 'submissions' || type === 'solvedExam') && list.length > 0 && (
+                            <button className="btn" style={{ background: '#ef4444' }} onClick={() => { onRemoveFile(type); onClose(); }}>מחק הכל</button>
                         )}
                         <button className="btn close-modal-btn" onClick={onClose}>סגור</button>
                     </div>
@@ -168,7 +168,7 @@ export function UploadSection({ onFilesSelected, isGrading }) {
 
                 {/* 2. Solved Exam (Optional but Recommended) */}
                 <div
-                    className={`upload-zone ${dragActive.solvedExam ? 'drag-active' : ''} ${files.solvedExam ? 'file-selected' : ''}`}
+                    className={`upload-zone ${dragActive.solvedExam ? 'drag-active' : ''} ${files.solvedExam && files.solvedExam.length > 0 ? 'file-selected' : ''}`}
                     onDragEnter={(e) => handleDrag('solvedExam', e)}
                     onDragLeave={(e) => handleDrag('solvedExam', e)}
                     onDragOver={(e) => handleDrag('solvedExam', e)}
@@ -176,24 +176,26 @@ export function UploadSection({ onFilesSelected, isGrading }) {
                 >
                     <h3>2. מבחן פתור / דוגמה (אופציונלי)</h3>
                     <p className="text-dim">
-                        {files.solvedExam ? `נבחר: ${files.solvedExam.name}` : 'מומלץ! גרור מבחן פתור לדוגמה'}
+                        {files.solvedExam && files.solvedExam.length > 0
+                            ? (files.solvedExam.length === 1 ? `נבחר: ${files.solvedExam[0].name}` : `נבחרו ${files.solvedExam.length} קבצים`)
+                            : 'מומלץ! גרור מבחנים פתורים (ניתן להעלות עד 5)'}
                     </p>
-                    {files.solvedExam && <div className="file-counter">1</div>}
+                    {files.solvedExam && files.solvedExam.length > 0 && <div className="file-counter">{files.solvedExam.length}</div>}
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                        {files.solvedExam && (
+                        {files.solvedExam && files.solvedExam.length > 0 && (
                             <button className="view-files-btn" onClick={(e) => {
                                 e.preventDefault();
                                 setShowModal('solvedExam');
                             }}>👁️ הצג</button>
                         )}
-                        {files.solvedExam && (
+                        {files.solvedExam && files.solvedExam.length > 0 && (
                             <button className="view-files-btn" style={{ background: '#ef4444' }} onClick={(e) => {
                                 e.preventDefault();
                                 handleRemoveFile('solvedExam');
-                            }}>🗑️ מחק</button>
+                            }}>🗑️ מחק הכל</button>
                         )}
                     </div>
-                    <input type="file" onChange={(e) => handleFileChange('solvedExam', e)} accept=".pdf,.txt,.md,.docx,.jpg,.jpeg,.png" />
+                    <input type="file" multiple onChange={(e) => handleFileChange('solvedExam', e)} accept=".pdf,.txt,.md,.docx,.jpg,.jpeg,.png" />
                 </div>
 
                 {/* 3. Rubric (Optional) */}

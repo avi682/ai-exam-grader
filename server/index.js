@@ -19,14 +19,14 @@ const upload = multer({ storage: storage });
 
 app.post('/api/grade', upload.fields([
     { name: 'exam', maxCount: 1 },
-    { name: 'solvedExam', maxCount: 1 },
+    { name: 'solvedExam', maxCount: 5 }, // Allow up to 5 solved exams
     { name: 'submissions', maxCount: 50 }
 ]), async (req, res) => {
     try {
         const examFile = req.files['exam'] ? req.files['exam'][0] : null;
-        const solvedExamFile = req.files['solvedExam'] ? req.files['solvedExam'][0] : null; // Support solved exam
+        const solvedExamFiles = req.files['solvedExam'] || []; // Helper to get array
         const rubricText = req.body.rubricText;
-        const specialInstructions = req.body.specialInstructions; // Support special instructions
+        const specialInstructions = req.body.specialInstructions;
         const submissionFiles = req.files['submissions'] || [];
 
         // Only submissions are strictly required now
@@ -36,11 +36,12 @@ app.post('/api/grade', upload.fields([
 
         console.log("Step 1: Generating optimal grading prompt...");
         const firstSubmission = submissionFiles[0];
+
+        // Pass the array of solved exam files
         let optimalPrompt = await generateOptimalPrompt(
             examFile ? examFile.buffer : null,
             examFile ? examFile.mimetype : null,
-            solvedExamFile ? solvedExamFile.buffer : null,
-            solvedExamFile ? solvedExamFile.mimetype : null,
+            solvedExamFiles,
             rubricText || '',
             specialInstructions || '',
             firstSubmission.buffer,
@@ -49,7 +50,8 @@ app.post('/api/grade', upload.fields([
 
         if (!optimalPrompt) {
             console.log("Using fallback prompt");
-            optimalPrompt = constructOptimizedPrompt(rubricText, specialInstructions, solvedExamFile != null);
+            // Pass boolean if any solved exam exists
+            optimalPrompt = constructOptimizedPrompt(rubricText, specialInstructions, solvedExamFiles.length > 0);
         }
 
         console.log("Step 2: Grading submissions...");
@@ -62,8 +64,7 @@ app.post('/api/grade', upload.fields([
                 examFile ? examFile.mimetype : null,
                 submissionFile.buffer,
                 submissionFile.mimetype,
-                solvedExamFile ? solvedExamFile.buffer : null,
-                solvedExamFile ? solvedExamFile.mimetype : null
+                solvedExamFiles
             );
 
             let finalStudentName = gradeResult.studentName;
